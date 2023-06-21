@@ -174,7 +174,7 @@ Runnable r = () -> System.out.println(portNumber);
 ```
 
 람다는 인스턴스 변수와 정적 변수를 자유롭게 캡처 (자신의 바디에서 참조) 할 수 있지만 **지역 변수는 명시적으로**
-``final`` 로 선언된 변수와 똑같이 사용되어야 한다.
+`final` 로 선언된 변수와 똑같이 사용되어야 한다.
 
 즉, 한 번만 할당할 수 있는 지역 변수는 캡처링할 수 있다.
 
@@ -184,7 +184,7 @@ Runnable r = () -> System.out.println(portNumber);
 portNumber = 8080;
 ```
 
-위의 코드는 지역 변수인 ``portNumber`` 에 값을 **두 번 할당** 하므로 컴파일할 수 없는 코드가 된다.
+위의 코드는 지역 변수인 `portNumber` 에 값을 **두 번 할당** 하므로 컴파일할 수 없는 코드가 된다.
 
 ### 지역 변수의 제약
 
@@ -200,7 +200,7 @@ portNumber = 8080;
 
 클로저를 다른 함수의 인수로 전달할 수 있다.
 
-클로저는 외부에 정의된 변수의 값에 접근하고 값을 바꿀 수 있다. 
+클로저는 외부에 정의된 변수의 값에 접근하고 값을 바꿀 수 있다.
 
 자바 8의 람다도 이와 비슷한 동작을 수행한다.
 
@@ -236,22 +236,53 @@ inventory.sort(comparing(Apple::getWeight));
 
 메서드 참조는 명시적으로 메서드명을 참조함으로써 가독성을 높일 수 있다.
 
-메서드 참조는 메서드명 앞에 구분자 (``::`` ) 를 붙이는 방식으로 참조할 수 있다.
+메서드 참조는 메서드명 앞에 구분자 (`::` ) 를 붙이는 방식으로 참조할 수 있다.
 
-``Apple::getWeight`` 는 람다 표현식 ``(Apple a) -> a.getWeight()`` 를 축약한 것이다.
+`Apple::getWeight` 는 람다 표현식 `(Apple a) -> a.getWeight()` 를 축약한 것이다.
 
 ### 메서드 참조를 만드는 방법
 
 메서드 참조는 세 가지 유형으로 구분할 수 있다.
 
 - 정적 메서드 참조
-  - Integer 의 parseInt 메서드는 ``Integer::parseInt`` 로 표현할 수 있다.
+  - Integer 의 parseInt 메서드는 `Integer::parseInt` 로 표현할 수 있다.
 - 다양한 형식의 인스턴스 메서드 참조
-  - String 의 length 메서드는 ``String::length`` 로 표현할 수 있다.
+  - String 의 length 메서드는 `String::length` 로 표현할 수 있다.
 - 기존 객체의 인스턴스 메서드 참조
-  - transaction 인스턴스에 getValue 메서드가 있다면 ``transaction::getValue`` 로 표현할 수 있다.
+  - transaction 인스턴스에 getValue 메서드가 있다면 `transaction::getValue` 로 표현할 수 있다.
 
 컴파일러는 람다 표현식을 검사하던 방식과 비슷한 과정으로 메서드 참조가 주어진 함수형 인터페이스와 호환하는지 확인한다.
 
 **메서드 참조는 콘텍스트의 형식과 일치해야한다.**
 
+### 생성자 참조
+
+`ClassName::new` 처럼 클래스명과 `new` 키워드를 이용해 기존 생성자의 참조를 만들 수 있다.
+
+`ClassName::new` 는 인수가 없는 생성자를 의미하며 `Supplier` 의 `() -> Apple` 과 같은 시그니처를 갖는다.
+
+```java
+Supplier<Apple> c1 = Apple::new
+Apple a1 = c1.get();
+```
+
+위처럼 생성자를 메서드 참조로 사용할 수 있다.
+
+인수를 하나 전달받는 생성자를 참조하려면 `Function<T, R>` 을 사용하면 된다.
+
+```java
+Function<Integer, Apple> c2 = Apple::new;
+Apple a2 = c2.apply(110);
+```
+
+위의 코드처럼 사용하면된다.
+
+만약 여러개의 인수를 받는 생성자를 사용하고 싶다면 해당 생성자와 일치하는 시그니처를 가지는 인터페이스를 직접 정의해 사용하면 된다.
+
+```java
+public interface TriFunction<T, U, V, R> {
+	R apply(T t, U u, V v);
+}
+
+TriFunction<Integer, Integer, Integer, Color> colorFactory = Color::new;
+```
