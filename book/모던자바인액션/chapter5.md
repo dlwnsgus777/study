@@ -360,3 +360,60 @@ int sum = Arrays.stream(numberArray).sum();
 예를들어 `Files.lines` 는 주어진 파일의 행 스트림을 문자열로 반환한다.
 
 `Stream` 인터페이스는 `AutoCloseable` 인터페이스를 구현하기 때문에 `try` 블록 내의 자원은 자동으로 관리된다.
+
+### 함수로 무한 스트림 만들기
+
+함수에서 스트림을 만들 수 있는 두 정적 메서드 `Stream.iterate`와 `Stream.generate`를 제공한다.
+
+두 연산을 이용해서 **무한 스트림**을 만들 수 있다.
+
+**무한 스트림**은 크기가 고정되지 않은 스트림을 의미한다.
+
+무제한으로 값을 계산하기 때문에 `limit` 함수를 함께 연결해서 사용한다.
+
+```java
+Stream.iterate(0, n -> n + 2).limit(10).forEach(System.out::println);
+```
+
+`iterate` 메서드는 초깃값과 람다를 인수로 받아 새로운 값을 끈임없이 생산할 수 있다.
+
+위의 예제는 짝수 스트림을 생성하는 코드이다.
+
+`iterate`는 기존 결과에 의존해 순차적으로 연산을 수행한다.
+
+`iterate`는 요청할 때마다 값을 생산할 수 있으며 이러한 스트림을 **언바운드 스트림** 이라고 표현한다.
+
+일반적으로 **연속된 인련의 값** 을 만들 때 `iterate` 를 사용한다.
+
+자바 9에서는 `iterate` 메서드에서 프레디케이트를 지원한다.
+
+```java
+IntStream.iterate(0, n -> n < 100, n -> n + 4)
+				.forEach(System.out::println);
+```
+
+두 번째 인수로 프레디케이트를 받아 언제까지 작업을 수행할 것인지 기준을 정할 수 있다.
+
+주의할 점은 무한 스트림에서 `filter`를 사용하면 안된다는 점이다.
+
+`filter` 메서드는 언제 작업을 중단해야 하는지를 알 수 없기 때문이다.
+
+`filter` 대신 `takeWhile` 을 이용하도록 한다.
+
+```java
+IntStream.iterate(0, n -> n + 4)
+				.takeWhile(n -> n < 100)
+				.forEach(System.out::println);
+```
+
+`generate` 메서드는 `iterate` 메서드와는 다르게 각 값을 연속적으로 계산하지 않는다.
+
+`generate` 는 `Supplier<T>` 를 인수로 받아 **새로운 값을 반환**한다.
+
+```java
+Stream.generate(Math::random).limit(5).forEach(System.out::println);
+```
+
+위의 예제는 0에서 1 사이에서 임의의 더블 숫자 다섯 개를 만든다.
+
+ 
