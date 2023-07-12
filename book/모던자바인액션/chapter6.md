@@ -269,3 +269,67 @@ Map<Dish.Type, Dish> mostCaloricByType = menu.stream().collect(
 반환되는 컬렉터는 기존 컬렉터의 래퍼 역할을 하며 `collect`의 마지막 과정에서 변환 함수로 자신이 반환하는 값을 매핑한다.
 
 ### 분할
+
+분할은 **분할 함수**라 불리는 프레디케이트를 분류 함수로 사용하는 특수한 그룹화 기능이다.
+
+분할 함수는 불리언을 반환하므로 `Map`의 `key`형식은 `Boolean`이다.
+
+따라서 결과로 나오는 그룹화 맵은 최대 두 개의 그룹으로 분류된다.
+
+```java
+Map<Boolean, List<Dish>> partitionedMenu = menu.stream().collect(Collectors.partitioningBy(Dish::isVegetarian));
+```
+
+위의 코드는 메뉴에서 채식인 메뉴와 채식이 아닌 메뉴를 분류하는 코드이다.
+
+분할 함수가 반환하는 참, 거짓 두 가지 요소의 스트림 리스트를 모두 유지한다는 것이 분할의 장점이다.
+
+```java
+Map<Boolean, Map<Dish.Type, List<Dish>>> vegetarianDishedByType = menu.stream().collect(
+            Collectors.partitioningBy(Dish::isVegetarian,
+                  Collectors.groupingBy(Dish::getType))
+      );
+```
+
+위의 코드처럼 컬렉터를 두 번쨰 인수로 전달할 수 있는 오버로드된 버전의 `partitioningBy` 메서드도 있다.
+
+`groupingBy` 에서 다수준으로 그룹화를 한 것처럼 `partitioningBy`를 사용해 다수준으로 분할하는 기법도 존재한다.
+
+```java
+menu.stream().collect(Collectors.partitioningBy(Dish::isVegetarian,
+      Collectors.partitioningBy(d -> d.getCalories() > 500)));
+```
+
+---
+
+### Collector 인터페이스
+
+`Collector` 인터페이스는 리듀싱 연산(컬렉터)을 어떻게 구현할지 제공하는 메서드 집합으로 구성된다.
+
+`Collector` 인터페이스를 구현하는 리듀싱 연산을 직접 만들 수 있다.
+
+`Collector` 인터페이스의 시그니처는 다음과 같다
+
+```java
+public interface Collector<T, A, R> {
+    Supplier<A> supplier();
+    BiConsumer<A, T> accumulator();
+    BinaryOperator<A> combiner();
+    Function<A, R> finisher();
+    Set<Characteristics> characteristics();
+}
+```
+
+- T: 수집될 스트림 항목의 제네릭 형식
+- A: 누적자, 수집 과정에서 중간 결과를 누적하는 객체의 형식
+- R: 수집 연산 결과 객체의 형식(주로 컬렉션 형식이다.)
+
+`List` 로 수집하는 `Collector` 클래스를 구현한다면 다음과 같이 선언할 수 있다.
+
+```java
+public class ToListCollector<T> implements Collector<T, List<T>, List<T>>
+```
+
+보통 누적 과정에서 사용되는 객체가 수집 과정의 최종 결과로 사용된다.
+
+### Collector 인터페이스의 메서드
