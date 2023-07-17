@@ -333,3 +333,97 @@ public class ToListCollector<T> implements Collector<T, List<T>, List<T>>
 보통 누적 과정에서 사용되는 객체가 수집 과정의 최종 결과로 사용된다.
 
 ### Collector 인터페이스의 메서드
+
+### supplier: 새로운 결과 컨테이너 만들기
+
+`supplier` 메서드는 빈 결과로 이루어진 `Supplier`를 반환해야한다.
+
+수집 과정에서 빈 누적자 인스턴스를 만드는 **파라미터가 없는 함수**이다.
+
+```java
+public Supplier<List<T>> supplier() {
+      return () -> new ArrayList<T>();
+      // ArrayList::new; -> 생성자 참조를 전달하는 방법도 있다.
+}
+```
+
+### accumulator: 결과 컨테이너에 요소 추가하기
+
+`accumulator` 메서드는 리듀싱 연산을 수행하는 함수를 반환한다.
+
+누적자(스트림의 첫 n - 1개 항목을 수집한 상태)와 n번째 요소를 함수에 적용한다.
+
+```java
+public BiConsumer<List<T>, T> accumulator() {
+      return (list, item) -> list.add(item); 
+      // List:add -> 메서드 참조를 사용할 수 있다.
+}
+```
+
+### finiser: 최종 변환값을 결과 컨테이너로 적용
+
+`finiser` 메서드는 스트림 탐색을 끝내고 누적자 객체를 최종 결과로 변환하면서 누적 과정을 끝낼 때 호출할 함수를 반환한다.
+
+떄로는 누적자 객체가 이미 최종 결과인 상황도 있는데 이럴 때는 변환 과정이 필요하지 않으므로 `finisher`메서드는 **항등 함수**를 반환한다.
+
+```java
+public Function<List<T>, List<T>> finisher() {
+      return Function.identity();
+}
+```
+
+### combiner: 두 결과 컨테이너 병합
+
+`combiner`메서드는 리듀싱 연산에서 사용할 함수를 반환한다.
+
+`combiner`메서드는 스트림의 서로 다른 서브파트를 병렬로 처리할 때 누적자가 이 결과를 어떻게 처리할지 정의한다.
+
+```java
+public BinaryOperator<List<T>> combiner() {
+      return (list1, list2) -> {
+            list1.addAll(list2);
+            return list1;
+      }
+}
+```
+
+### Characteristics 메서드
+
+`Characteristics` 메서드는 컬렉터의 연산을 정의하는 `Characteristics` 형식의 불변 집합을 반환한다.
+
+`Characteristics`는 스트림을 병렬로 리듀스할 것인지 그리고 병렬로 리듀스한다면 어떤 최적화를 선택해야 할지 힌트를 제공한다.
+
+`Characteristics`는 다음 세 항목을 포함한다.
+
+- `UNORDERED`: 리듀싱 결과는 스트림 요소의 방문 순서나 누적 순서에 영향을 받지 않는다.
+- `CONCURRENT`: 다중 스레드에서 `accumulator` 함수를 동시에 호출할 수 있으며 이 컬렉터는 병렬 리듀싱을 수행할 수 있다. 컬렉터의 플래그에 `UNORDERED` 를 함께 설정하지 않았다면 데이터 소스가 정렬되어 있지 않은 상황에서만 병렬 리듀싱을 수행할 수 있다.
+- `IDENTITY_FINISH`: `finisher` 메서드가 반환하는 함수는 단순히 `identity`를 적용할 뿐이므로 이를 생략할 수 있다. 리듀싱 과정의 최종 결과로 누적자 객체를 바로 사용할 수 있다.
+
+```java
+public Set<Characteristics> characteristics() {
+      return Collections.unmodifiableSet(
+            EnumSet.of(IDENTITY_FINISH, CONCURRENT);
+      )
+}
+```
+
+커스텀 컬렉터를 적용하려면 `new`로 인스턴스화 해야한다.
+
+```java
+menuStream.collect(new MyListCollector<Dish>());
+```
+
+`IDENTITY_FINISH` 수집 연산에서는 컬렉터 구현을 만들지 않고도 커스텀 컬렉터를 수행할 수 있다.
+
+```java
+List<Dish> dishes = menuStream.collect(
+      ArrayList::new, // 발행
+      List::add,      // 누적  
+      List::addAll    // 합침
+)
+```
+
+코드는 더 간결해졌지만 가독성은 떨어진다.
+
+또한 `Characteristics`를 전달할 수 없기 때문에 `IDENTITY_FINISH`와 `CONCURRENT`지만 `UNORDERED`는 아닌 컬렉터로만 동작한다.
+
