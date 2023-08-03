@@ -103,3 +103,35 @@ Optional<String> name = optInsurance.map(Insurance::getName);
 - `ifPresent(Cunsumer<? super T> consumer)`: 값이 존재할 때 인수로 넘겨준 동작을 실행하고 값이 없으면 아무 일도 일어나지 않는다.
 - `ifPresentOrElse(Consumer<? super T> action, Runnable emptyAction)` : 자바9에 추가된 메서드이다.
   - 값이 없을 때 실행할 수 있는 `Runnable`을 인수로 받는다.
+
+### 두 Optional 합치기
+
+```java
+public Optional<Insurance> nullSafeFindCheapestInsurance(
+  Optional<Person> person, Optional<Car> car
+) {
+  if (person.isPresent() && car.isPresent()) {
+    return Optional.of(findCheapestInsurance(person.get(), car.get());
+  } else {
+    return Optional.empty();
+  }
+}
+```
+
+위의 코드는 `person`과 `car` 객체가 있는지 확인하고 값을 리턴하므로 `null` 확인 코드와 다를게 없다.
+
+```java
+public Optional<Insurance> nullSafeFindCheapestInsurance(
+  Optional<Person> person, Optional<Car> car
+) {
+  return person.flatMap(p -> car.map(c -> findCheapestInsurance(p, c)));
+}
+```
+
+위와 같이 두 `Optional`을 합칠 수 있다.
+
+만약 첫번째 `Optional`이 비어있다면 인수로 전달한 표현식이 실행되지 않고
+
+두 번째 `Optional`에 값이 없으면 빈 `Optional`을 반환하므로 결국 `nullSafeFindCheapestInsurance`는 빈 `Optional`을 반환하게 된다.
+
+두 값이 모두 존재한다면 `findCheapestInsurance`메서드를 호출하므로 안전하게 두 `Optional`객체를 사용할 수 있다.
