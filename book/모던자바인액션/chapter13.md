@@ -11,6 +11,31 @@
 1. 정적 메서드
 2. 디폴트 메서드
 
+```java
+   public static void main(String[] args) {
+      Ttt ttt = new Ttt();
+
+      Test.test();
+//      ttt.test(); => 컴파일 에러
+
+      ttt.test1();
+   }
+
+    public interface Test {
+      static void test() {
+         System.out.println("test");
+      }
+
+      default void test1() {
+         System.out.println("test1");
+      }
+   }
+
+   public class Ttt implements Test {
+
+   }
+```
+
 이로인해 자바8 에서는 **메서드 구현을 포함하는 인터페이스**를 정의할 수 있다.
 
 이렇게 하면 기존의 구현을 바꾸도록 강요하지 않으면서 인터페이스에 새로운 기능을 추가할 수 있다.
