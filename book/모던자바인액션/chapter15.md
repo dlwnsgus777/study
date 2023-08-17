@@ -73,8 +73,9 @@
 스레드 풀을 사용할 때 두가지 사항을 주의해야 한다.
 
 1.  K 스레드를 가진 스레드 풀은 오직 K만큼의 스레드를 동시에 실행할 수 있다.
-  - 초과로 제출된 태스크는 큐에 저장되며 이전에 실행된 태스크 중 하나가 종료되기 전까지 스레드에 할당하지 않는다.
-  - 이때 다른 태스크에서 sleep이나 블록된 상황이 발생하면 작업의 효율성이 떨어지게 된다.
+
+- 초과로 제출된 태스크는 큐에 저장되며 이전에 실행된 태스크 중 하나가 종료되기 전까지 스레드에 할당하지 않는다.
+- 이때 다른 태스크에서 sleep이나 블록된 상황이 발생하면 작업의 효율성이 떨어지게 된다.
 
 2. 중요한 코드를 실행하는 스레드가 죽는 일이 발생하지 않도록 main이 반환하기 전에 모든 스레드 작업이 끝나길 기다린다.
    - 프로그램을 종료하기 전에 모든 스레드 풀을 종료하는 습관을 갖는 것이 중요하다.
@@ -133,6 +134,7 @@ System.out.println(y + z);
 Future<Integer> f(int x);
 Future<Integer> g(int x);
 ```
+
 ```java
 Future<Integer> y = f(x);
 Future<Integer> z = g(x);
@@ -222,7 +224,7 @@ f에 추가 인수로 콜백을 전달해 바디에서 `return`문으로 결과�
 
 `CompleableFuture` 에서는 예외를 처리할 수 있는 기능을 제공하며
 
-리액티브 형식의 API 에서는 Return대신 기존 콜백이 호출되므로 예외가 발생했을 때 실행될 추가 콜백을 만들어 인터페이스를  바꿔야한다.
+리액티브 형식의 API 에서는 Return대신 기존 콜백이 호출되므로 예외가 발생했을 때 실행될 추가 콜백을 만들어 인터페이스를 바꿔야한다.
 
 자바 9의 플로API 에서는 여러 콜백을 한 객체로 감싼다.
 
@@ -243,7 +245,7 @@ f(x)와 g(x) 를 동시에 질행해 합계를 구한 코드는 다음과 같다
       executorService.submit(() -> a.complete(f(x)));
       int b = g(x);
       System.out.println(a.get() + b);
-      
+
       executorService.shutdown();
    }
 ```
@@ -287,6 +289,203 @@ f(x)의 실행이 끝나지 않거나 실행이 끝나지 않은 상황에서 `g
 
 `Future`는 **한 번**만 실행해 결과를 제공한다.
 
+리액티브 프로그래밍은 시간이 흐르면서 여러 `Future`같은 객체를 통해 여러 결과를 제공한다.
 
+리액티브 프로그래밍은 어떠한 값에 **반응**하는 부분이 존재하기 때문에 리액티브라 부른다.
 
+자바 플로 API는 다음 세 가지로 정리된다.
 
+- 구독자가 구독할 수 있는 발행자
+- 이 연결을 구독(subscription)이라 한다.
+- 이 연결을 이용해 메시지(또는 이벤트)를 전송한다.
+
+엑셀의 두 셀을 더하는 수식을 포함하는 셀을 생각해본다.
+
+`=C1+C2` 공식을 사용해 `C3`을 만들면 `C1`과 `C2` 의 값이 갱신되면 `C3`에도 새로운 값이 반영된다.
+
+이를 `Publisher(셀의 이벤트에 구독할 수 있음)`와 `Subscribe(다른 셀의 이벤트에 반응함)`을 사용해 코드로 표현하면 다음과 같다.
+
+```java
+public class ModernJavaChapter15_1 {
+   public static void main(String[] args) {
+      SimpleCell c2 = new SimpleCell("c2");
+      SimpleCell c1 = new SimpleCell("c1");
+      SimpleCell c3 = new SimpleCell("c3");
+
+      c1.subscribe(c3);
+
+      c1.onNext(10);
+      c2.onNext(20);
+      c1.onNext(50);
+
+      System.out.println(c3.value);
+   }
+
+   public static class SimpleCell implements Publisher<Integer>, Subscriber<Integer> {
+      private int value = 0;
+      private String name;
+      private List<Subscriber> subscribers = new ArrayList<>();
+
+      public SimpleCell(String name) {
+         this.name = name;
+      }
+
+      @Override
+      public void subscribe(Subscriber<? super Integer> subscriber) {
+         subscribers.add(subscriber);
+      }
+
+      private void notifyAllSubscribers() {
+         subscribers.forEach(subscriber -> subscriber.onNext(this.value));
+      }
+
+      @Override
+      public void onNext(Integer integer) {
+         this.value = integer;
+         System.out.println(this.name + " : " + this.value);
+         notifyAllSubscribers();
+      }
+   }
+
+   public interface Publisher<T> {
+      void subscribe(Subscriber<? super T> subscriber);
+   }
+
+   public interface Subscriber<T> {
+      void onNext(T t);
+   }
+
+}
+```
+
+`C3`은 `C1`과 `C2`를 **구독**하기 때문에 값이 바뀔 때마다 반응한다.
+
+`C3=C1+C2`를 구현하면 다음과 같다.
+
+```java
+public class ModernJavaChapter15_2 {
+   public static void main(String[] args) {
+      SimpleCell c2 = new SimpleCell("c2");
+      SimpleCell c1 = new SimpleCell("c1");
+      ArithmeticCell c3 = new ArithmeticCell("c3");
+
+      c1.subscribe(c3::setLeft);
+      c2.subscribe(c3::setRight);
+
+      c1.onNext(10);
+      c2.onNext(20);
+      c1.onNext(50);
+
+   }
+
+   public static class ArithmeticCell extends SimpleCell {
+      private int left;
+      private int right;
+
+      public ArithmeticCell(String name) {
+         super(name);
+      }
+
+      public void setLeft(int left) {
+         this.left = left;
+         onNext(left + this.right);
+      }
+
+      public void setRight(int right) {
+         this.right = right;
+         onNext(right + this.left);
+      }
+   }
+
+   public static class SimpleCell implements Publisher<Integer>, Subscriber<Integer> {
+      private int value = 0;
+      private String name;
+      private List<Subscriber> subscribers = new ArrayList<>();
+
+      public SimpleCell(String name) {
+         this.name = name;
+      }
+
+      @Override
+      public void subscribe(Subscriber<? super Integer> subscriber) {
+         subscribers.add(subscriber);
+      }
+
+      private void notifyAllSubscribers() {
+         subscribers.forEach(subscriber -> subscriber.onNext(this.value));
+      }
+
+      @Override
+      public void onNext(Integer integer) {
+         this.value = integer;
+         System.out.println(this.name + " : " + this.value);
+         notifyAllSubscribers();
+      }
+   }
+
+   public interface Publisher<T> {
+      void subscribe(Subscriber<? super T> subscriber);
+   }
+
+   public interface Subscriber<T> {
+      void onNext(T t);
+   }
+
+}
+```
+
+데이터바 발행자(생상자)에서 구독자(소비자)로 흐르는 것에 착안해 개발자는 이를 **업스트림**과 **다운스트림**으로 부른다.
+
+`onNext`외에도 `onError`나 `onComplete` 같은 메서드를 사용해 데이터 흐름에서 예외가 발생하거나 데이터 흐름이 종료되었음을 알 수 있다.
+
+### 압력
+
+매 초마다 수천 개의 메시지가 `onNext`로 전달되는 상황을 **압력**이라 부른다.
+
+자바 9의 플로 API는 발행자가 무한의 속도로 아이템을 방출하는 대신 요청했을 때만 다음 아이템을 보내도록 `request()` 메서드를 제공한다.
+
+자바 9 플로 API의 `Subscriber`인터페이스는 네 번째 메서드를 포함한다.
+
+```java
+void onSubscribe(Subscription subscription);
+```
+
+`Publisher`와 `Subscriber` 사이에 채널이 연결되면 첫 이벤트로 이 메서드가 호출된다.
+
+```java
+interface Subscription {
+   void cancel();
+   void request(long n);
+}
+```
+
+`Publisher`는 `Subscription` 객체를 만들어 `Subscriber`로 전달하면 `Subscriber`는 이를 이용해 `Publisher`로 정보를 보낼 수 있다.
+
+한번에 한 개의 이벤트를 처리하도록 발행-구독 연결을 구성하려면 다음 작업이 필요하다.
+
+- Subscriber가 OnSubscribe로 전달된 Subscription 객체를 subscription 같은 필드에 로컬로 저장한다.
+- Subscriber가 수많은 이벤트를 받지 않도록 onSubscribe, onNext, onError의 마지막 동작에 channel.request(1)을 추가해 오직 한 이벤트만 요청한다.
+- 요청을 보낸 채널에만 onNext, onError 이벤트를 보내도록 Publisher의 notifyAllSubscribers 코드를 바꾼다.
+
+구현은 간단해 보이지만 역압력을 구현하려면 여러가지 장단점을 고려해야한다.
+
+- 여러 Subscriber가 있을 때 이벤트를 가장 느린 속도로 보낼 것인가? 아니면 각 Subscriber에게 보내지 않은 데이터를 저장할 별도의 큐를 가질 것인가?
+- 큐가 너무 커지면 어떻게 해야 할까?
+- Subscriber가 준비가 안 되었다면 큐의 데이터를 폐기할 것인가?
+
+이는 데이터를 성격에 따라 달라진다. 하나의 온도 데이터를 잃어버리는 것은 큰 문제가 아니지만 은행 계좌에서 크레딧이 사라지는 것은 큰일이다.
+
+당김 기반 리액티브 역압력이라는 개념은 Subscriber가 Publisher로부터 요청을 당긴다는 의미애서 **리액티브 당김 기반**이라 불린다.
+
+### 리액티브 시스템 VS 리액티브 프로그래밍
+
+리액티브 시스템이 가져야 할 공식적인 속성은 다음과 같이 요약할 수 있다.
+
+- 반응성
+  - 큰 작업을 처리하느라 간단한 질의의 응답을 지연하지 않고 실시간으로 입력에 반응하는 것
+- 회복성
+  - 한 컴포넌트의 실패로 전체 시스템이 실패하지 않음
+- 탄력성
+  - 자신의 작업 부하에 맞게 적응하며 작업을 효율적으로 처리함
+
+이렇한 시스템은 리액티브 프로그래밍을 이용해 구현할 수 있다.
