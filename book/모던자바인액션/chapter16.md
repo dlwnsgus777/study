@@ -279,3 +279,39 @@ public class NonBlockApiExample {
 - 작업이 I/O를 기다리는 작업을 병렬로 실행한다면 CompetalbeFuture가 더 많은 유연성을 제공하며 대기/계산의 비율에 적합한 스레드 수를 설정할 수 있다
 
 ### 비동기 작업 파이프라인 만들기
+
+```java
+public class Discount {
+   public enum Code {
+      NONE(0),
+      SILVER(5),
+      GOLD(10),
+      PLATINUM(15),
+      DIAMOND(20);
+
+      private final int percentage;
+
+      Code(int percentage) {
+         this.percentage = percentage;
+      }
+   }
+}
+```
+
+할인과 관련한 기능을 추가한다.
+
+```java
+   public String getPrice(String product) {
+      double price = calculatePrice(product);
+      Discount.Code code = Discount.Code.values()[
+            random.nextInt(Discount.Code.values().length)
+            ];
+      return String.format("%s:%.2f:%s", name, price, code);
+   }
+```
+
+`Shop`클래스의 `getPrice` 를 수정한다.
+
+```java
+
+```
