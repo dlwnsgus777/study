@@ -236,3 +236,46 @@ public class NonBlockApiExample {
 하지만 만족할만한 결과는 나오지 않았다.
 
 ### 더 확장성이 좋은 해결 방법
+
+병렬 스트림은 네 개의 상점에 대해 하나의 스레드를 할당해 네 개의 작업을 병렬로 수행했다.
+
+만약 스레드는 4개지만 검색할 상점이 5개라면 4개의 상점을 검색하느라 모든 스레드를 사용하기 떄문에 다섯 번째 상점을 처리하는데 추가로 1초 정도의 시간이 소요된다.
+
+4개의 스레드 중 누군가가 작업을 완료해야 다섯 번째 상점을 검색할 수 있다.
+
+`CompletableFuture`에서는 작업에 사용할 `Executor`를 지정할 수 있기 때문에 스레드 풀의 크기를 조절하는 등 애플리케이션에 맞는 최적화된 설정을 할 수 있다.
+
+### 커스텀 Executor 사용하기
+
+- 스레드 풀 크기 조절
+  - 스레드 풀의 최적값을 찾는 공식은 다음과 같다.
+  - N(스레드) = NCpu _ UCpu _ (1 + W/C)
+    - NCpu: `Runtime.getRuntime().availableProcessors()` 반환값
+    - UCpu: 0과 1 사이의 값을 갖는 CPU 활용 비율
+    - W/C: 대시기산과 계산시간의 비율
+
+```java
+      final Executor executor = Executors.newFixedThreadPool(Math.min(shops.size(), 100),
+            new ThreadFactory() {
+               @Override
+               public Thread newThread(Runnable r) {
+                  Thread t = new Thread(r);
+                  t.setDaemon(true);
+                  return t;
+               }
+            }
+      );
+```
+
+위처럼 스레드 풀을 설정할 수 있다.
+
+위의 코드에서는 스레드 풀의 스레드들을 **데몬 스레드**로 설정했다.
+
+데몬 스레드는 자바 프로그램이 종료될 때 강제로 실행이 종료될 수 있다.
+
+### 스트림 병렬화와 CompetalbeFuture 병렬화
+
+- I/O가 포함되지 않은 계산 중심의 동작을 실행할 때는 스트림이 가장 구현하기 간단하며 효율적일 수 있다.
+- 작업이 I/O를 기다리는 작업을 병렬로 실행한다면 CompetalbeFuture가 더 많은 유연성을 제공하며 대기/계산의 비율에 적합한 스레드 수를 설정할 수 있다
+
+### 비동기 작업 파이프라인 만들기
