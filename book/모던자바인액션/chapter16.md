@@ -295,7 +295,27 @@ public class Discount {
          this.percentage = percentage;
       }
    }
+
+   public static String applyDiscount(Quote quote) {
+      return quote.getShopName() + " price is " +
+            Discount.apply(quote.getPrice(),
+                           quote.getDiscountCode());
+   }
+
+   private static void delay() {
+      try {
+         Thread.sleep(1000L);
+      } catch (InterruptedException e) {
+         throw new RuntimeException(e);
+      }
+   }
+
+   private  static String apply(double price, Code code) {
+      delay();
+      return String.valueOf(price * (100 - code.percentage) / 100);
+   }
 }
+
 ```
 
 할인과 관련한 기능을 추가한다.
@@ -313,5 +333,189 @@ public class Discount {
 `Shop`클래스의 `getPrice` 를 수정한다.
 
 ```java
+public class Quote {
+   private final String shopName;
+   private final double price;
+   private final Discount.Code discountCode;
 
+   public Quote(String shopName, double price, Discount.Code discountCode) {
+      this.shopName = shopName;
+      this.price = price;
+      this.discountCode = discountCode;
+   }
+
+   public static Quote parse(String s) {
+      String[] split = s.split(":");
+      String shopName = split[0];
+      double price = Double.parseDouble(split[1]);
+      Discount.Code discountCode = Discount.Code.valueOf(split[2]);
+      return new Quote(shopName, price, discountCode);
+   }
+
+   public String getShopName() {
+      return shopName;
+   }
+
+   public double getPrice() {
+      return price;
+   }
+
+   public Discount.Code getDiscountCode() {
+      return discountCode;
+   }
+}
 ```
+
+상점에서 제공하는 문자열을 파싱하는 `Quote` 클래스를 작성한다.
+
+```java
+public class NonBlockApiExample {
+   public static void main(String[] args) {
+      List<Shop> shops = Arrays.asList(
+            new Shop("BestPrice"),
+            new Shop("LetsSaveBig"),
+            new Shop("MyFavorite"),
+            new Shop("BuyItAll")
+      );
+      final Executor executor = Executors.newFixedThreadPool(Math.min(shops.size(), 100),
+            new ThreadFactory() {
+               @Override
+               public Thread newThread(Runnable r) {
+                  Thread t = new Thread(r);
+                  t.setDaemon(true);
+                  return t;
+               }
+            }
+      );
+
+
+      long start = System.nanoTime();
+      long invocationTime = ((System.nanoTime() - start) / 1_000_000);
+
+      System.out.println("Invocation returned after " + invocationTime  + " mesc");
+
+      // 가격 계산 동안 다른 메서드 수행
+      System.out.println(findPrices("iPhone", shops));
+
+
+      long retrievalTime = ((System.nanoTime() - start) / 1_000_000);
+      System.out.println("price returned after " + retrievalTime + " mesc");
+   }
+
+
+   public static List<String> findPrices(String product, List<Shop> shops) {
+      return shops.stream()
+            .map(shop -> shop.getPrice(product))
+            .map(Quote::parse)
+            .map(Discount::applyDiscount)
+            .collect(Collectors.toList());
+   }
+}
+```
+
+`Discount` 서비스를 이용하는 코드를 작성한다.
+
+위의 `findPrices`는 3개의 `map`을 연결한다.
+
+- 각 상점을 요청한 제품의 가격과 할인 코드로 변환
+- 변환한 문자열을 파싱해 `Quote` 객체 생성
+- `Discount` 서비스에 접근해 최종 할인가격을 계산하고 가격에 대응하는 상점 이름을 포함하는 문자열 반환
+
+위의 코드는 성능 최적화와는 거리가 멀다.
+
+`CompletableFuture`에서 수행하는 태스크를 설정할 수 있는 커스텀 `Executor`를 정의해 CPU 사용을 극대화할 수 있다.
+
+```java
+   public static List<String> findPrices(String product, List<Shop> shops, Executor executor) {
+      List<CompletableFuture<String>> priceFutures = shops.stream()
+            .map(shop -> CompletableFuture.supplyAsync(
+                  () -> shop.getPrice(product), executor))
+            .map(future -> future.thenApply(Quote::parse))
+            .map(future -> future.thenCompose(
+                  quote -> CompletableFuture.supplyAsync(
+                        () -> Discount.applyDiscount(quote), executor
+                  )
+            )).collect(Collectors.toList());
+
+      return priceFutures.stream()
+            .map(CompletableFuture::join)
+            .collect(Collectors.toList());
+   }
+```
+
+1. `CompletableFuture.supplyAsync`에 람다 표현식을 전달해 비동기적으로 상점에서 정보를 조회했다.
+2. 1번의 결과 문자열을 `Quote`로 변환했다.
+   1. `thenApply` 메서드는 `CompletableFuture`가 끝날 떄까지 블록하지 않는다.
+   2. `CompletableFuture`가 동작을 완전히 완료한 다음 `thenApply` 메서드로 전달된 람다 표현식을 적용할 수 있다.
+3. `thenCompose`를 이용해 두 개의 비동기 연산을 파이프라인으로 만들 수 있다.
+   1. 상점에서 가격 정보를 얻어와 Quote로 변환
+   2. Discount 서비스로 전달해 최동가격 획득
+
+`thenCompose`는 첫 번째 연산의 결과를 두 번째 연산으로 전달한다.
+
+`Future`가 여러 상점에서 `Quote`를 얻는 동안 메인 스레드는 다른 유용한 작업을 실행할 수 있다.
+
+`CompletableFuture`가 완료되기를 기다렸다가 `join`으로 값을 추출할 수 있다.
+
+`Async`로 끝나는 메서드가 존재하는데 다음 작업이 다른 스레드에서 실행되도록 스레드 풀로 작업을 제출하는 기능이 있다.
+
+### 독립 CompleableFuture와 비독립 CompletableFuture 합치기
+
+독립적으로 실행된 두개의 `CompleableFuture`를 합쳐야하는 상황이 발생하면
+
+`thenCombine`메서드를 사용한다.
+
+`thenCombine`메서드는 두 개의 `CompletableFuture` 결과를 어떻게 합칠지 정의한 `BiFunction`을 두 번째 인수로 받는다.
+
+```java
+Future<Double> futurePriceInUSD =
+   CompleableFuture.supplyAsync(() -> shop.getPrice(product))
+   .thenCombine(
+      CompleableFuture.supplyAsync(
+         () -> exchangeService.getRate(Money.EUR, Money.USD),
+         (price, rate) -> prce * rate
+      )
+   );
+```
+
+첫 번째 태스크의 결과를 price로 두 번째 태스크의 결과를 rate로 받아 계산한다.
+
+### 타임아웃 효과적으로 사용하기
+
+자바 9에서는 `CompleableFuture`에 다양한 시간관련 기능이 추가되었다.
+
+- `orTimeout`: 지정된 시간이 지난 후 `CompleableFuture`를 `TimeoutException`으로 완료시킨다.
+
+  - 내부적으로 `ScheduledThreadExecutor`를 사용한다.
+
+- `completeOnTimeout`: `CompleableFuture`를 반환하기 떄문에 이 결과를 다른 `CompleableFuture`와 연결할 수 있다.
+  - 타임 아웃이 발생하면 미리 지정된 값을 사용할 수 있다.
+
+```java
+Future<Double> futurePriceInUSD =
+   CompleableFuture.supplyAsync(() -> shop.getPrice(product))
+   .thenCombine(
+      CompleableFuture.supplyAsync(
+         () -> exchangeService.getRate(Money.EUR, Money.USD),
+         (price, rate) -> prce * rate
+      )
+   ).orTimeout(3, TimeUnit.SECONDS);
+```
+
+`Future`가 3초 흐에 작업을 끝내지 못할 경우 `TimeoutException`이 발생한다.
+
+```java
+Future<Double> futurePriceInUSD =
+   CompleableFuture.supplyAsync(() -> shop.getPrice(product))
+   .thenCombine(
+      CompleableFuture.supplyAsync(
+         () -> exchangeService.getRate(Money.EUR, Money.USD))
+         .completeOnTimeout(DEFAULT_RATE, 1, TimeUnit.SECONDS),
+         (price, rate) -> prce * rate
+      )
+   ).orTimeout(3, TimeUnit.SECONDS);
+```
+
+`completeOnTimeout`를 사용해 설정한 시간에 작업이 끝나지 않을 경우 지정된 값을 사용한다.
+
+### CompletableFuture의 종료에 대응하는 방법
