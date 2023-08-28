@@ -519,3 +519,49 @@ Future<Double> futurePriceInUSD =
 `completeOnTimeout`를 사용해 설정한 시간에 작업이 끝나지 않을 경우 지정된 값을 사용한다.
 
 ### CompletableFuture의 종료에 대응하는 방법
+
+예제 코드에서는 메서드의 응답 시간을 1초의 지연으로 통일되게 만들었지만
+
+실무에서는 다양한 원격 서비스의 호출 지연을 예측하기가 어렵다.
+
+먼저 모든 가격 정보를 포함할 때까지 리스트 생성을 기다리지 않도록 프로그램을 고쳐야한다.
+
+```java
+   public Stream<CompletableFuture<String>> findPricesStream(String product, List<Shop> shops, Executor executor) {
+      return shops.stream()
+              .map(shop -> CompletableFuture.supplyAsync(
+                      () -> shop.getPrice(product, executor))
+              ).map(future -> future.thenApply(Quote::parse))
+              .map(future -> future.thenCompose(quote -> 
+                  CompletableFuture.supplyAsync(
+                          () -> Discount.applyDiscount(quote),
+                          executor
+                  )        
+              ));
+   }
+```
+
+`CompleableFuture`는 `thenAccept`라는 메서드를 제공한다.
+
+`thenAccept`는 `CompleableFuture`의 계산이 끝나면 값을 소비한다.
+
+`thenAccept` 메서드는 연산 결과를 소비하는 `Comsumer`를 인수로 받는다.
+
+```java
+CompletableFuture[] futures = findPricesStream("Phone")
+.map(f -> f.thenAccept(System.out::println))
+.toArray(size -> new CompletableFuture[size]);
+
+CompletableFuture.allOf(futures).join();
+```
+
+`allOf`는 `CompleableFuture`를 배열로 입력받는다.
+
+`allOf`는 `CompleableFuture<Void>`를 반환하는데 전달된 모든 `CompleableFuture`가 완료되어야 반환된 `CompleableFuture<Void>`가 완료된다.
+
+`allOf`가 봔환하는 `CompleableFuture`에 `join`을 호출하면 모든 `CompleableFuture`가 완료될 때까지 기다릴 수 있다.
+
+`anyOf`메서드는 배열의 `CompleableFuture` 중 하나의 작업이 끝나길 기다리는 메서드이다.
+
+`anyOf`메서드는 처음으로 완료한 `CompleableFuture`의 값으로 동작을 완료한다.
+
