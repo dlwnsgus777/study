@@ -108,3 +108,68 @@ onSubscribe onNext* (onError | onComplete)?
   - `cancel`를 몇 번을 호출해도 한 번 호출한 것과 같은 효과를 가져야한다. 여러 번 호출해도 스레드에 안전해야 한다.
   - 같은 `Subscriber` 객체에 다시 가입하는 것은 권장하지 않지만 강제하지는 않는다.
   
+### Reactor 예제코드
+
+```java
+public class TempInfo {
+   public static final Random random = new Random();
+
+   private final String town;
+   private final int temp;
+
+   public TempInfo(String town, int temp) {
+      this.town = town;
+      this.temp = temp;
+   }
+
+   public static TempInfo fetch(String town) {
+      if (random.nextInt(10) == 0) {
+         throw new RuntimeException("Error");
+      }
+
+      return new TempInfo(town, random.nextInt(100));
+   }
+
+   @Override
+   public String toString() {
+      return "TempInfo{" +
+            "town='" + town + '\'' +
+            ", temp=" + temp +
+            '}';
+   }
+
+   public String getTown() {
+      return town;
+   }
+
+   public int getTemp() {
+      return temp;
+   }
+}
+```
+
+```java
+Flux.interval(Duration.ofSeconds(1L))
+            .subscribeOn(Schedulers.boundedElastic())
+//            .doOnError(e -> log.info("Error")) doOnError는 오류 신호를 살펴보는데만 사용됨
+            .subscribe(i -> log.info(TempInfo.fetch("New York").toString()), e -> log.info("에러 발생"));
+```
+
+```java
+ // flux merge
+
+      var one = Flux.just(1);
+      var two = Flux.just(2);
+      var three = Flux.just(3);
+
+      Flux.merge(one, two, three)
+                      .subscribe(i -> log.info(TempInfoNormal.fetch("New York", i).toString()), e -> log.info("에러 발생"));
+
+```
+
+```java
+ // map
+      Flux.just(1)
+              .map(i -> i + 30)
+              .subscribe(i -> log.info(TempInfoNormal.fetch("New York", i).toString()), e -> log.info("에러 발생"));
+```
