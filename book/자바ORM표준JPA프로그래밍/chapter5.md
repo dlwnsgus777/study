@@ -341,5 +341,116 @@ JPA에서는 `List`를 포함한 `Collection`, `Set`, `Map` 같은 다양한 컬
 
 외래 키 하나만으로 양방향 조회가 가능하므로 처음부터 **양방향 관계이다.**
 
+### 양방향 연관관계 매핑
 
+```java
+@Entity
+public class Member {
+  @Id
+  @Column(name = "MEMBER_ID")
+  private String id;
+
+  private String username;
+
+  // 연관관계 매핑
+  @ManyToOne
+  @JoinColumn(name = "TEAM_ID")
+  private Team team;
+
+  // 연관관계 설정
+  public void setTeam(Team team) {
+    this.team = team;
+  }
+
+  public Team getTeam() {
+    return team;
+  }
+
+  public Member(final String id, final String username) {
+    this.id = id;
+    this.username = username;
+  }
+}
+```
+회원 엔티티는 변경한 부분이 없다.
+
+```java
+@Entity
+public class Team {
+
+  @Id
+  @Column(name = "TEAM_ID")
+  private String id;
+
+  private String name;
+  
+  // 추가
+  @OneToMany(mappedBy = "team")
+  private List<Member> members = new ArrayList<>();
+
+  public Team(final String id, final String name) {
+    this.id = id;
+    this.name = name;
+  }
+
+  public Team() {
+    
+  }
+}
+```
+
+회원과 팀은 일대다 관계이기 때문에 `@OneToMany`를 사용해 양방향 관계를 매핑했다.
+
+`mappedBy` 속성은 양방향 매핑일 때 **반대쪽 매핑의 필드 이름**을 넣어주면 된다.
+
+이제부터 팀에서 회원 컬렉션으로 객체 그래프를 탐색할 수 있다.
+
+```java
+Team team = em.find(Team.class, "team1");
+List<Member> members = team.getMembers();
+
+for (Member member : members) {
+  System.out.println(member.getUsername());
+}
+```
+
+### 연관관계의 주인
+
+엄밀히 말해 객체에는 양방향 연관관계라는 것이 없다.
+
+서로 다른 단방향 연관관계 2개를 양방향인 것처럼 보이게 할 뿐이다.
+
+객체 연관관계는 다음과 같다.
+
+- 회원 -> 팀 (단방향)
+- 팀 -> 회원 (단방향)
+
+엔티티를 양방향 연관관계로 설정하면 객체의 참조는 둘인데 **외래 키는 하나다.**
+
+두 객체의 연관관계 중 하나를 정해 테이블의 외래 키를 관리해야 하는데 이걸 **연 관관계의 주인**이라고 한다.
+
+### 양방향 매핑의 규칙: 연관관계의 주인
+
+양방향 연관관계 매팽시에는 두 연관관계 중 하나를 **연관관계의 주인**으로 정해야한 한다.
+
+**연관관계의 주인만이 외래 키를 등록, 수정, 삭제할 수 있다.**
+
+**주인이 아닌 쪽은 읽기만 할 수 있다.**
+
+연관관계의 주인은 `mappedBy` 속성을 사용해 정한다.
+
+- 주인은 `mappedBy` 속성을 사용하지 않는다.
+- 주인이 아니면 `mappedBy` 속성을 사용해 연관관계의 주인을 지정한다.
+
+연관관계의 주인을 정한다는 것은 **외래 키 관리자를 선택하는 것**이다.
+
+### 연관관계의 주인은 외래 키가 있는 곳
+
+연관관계의 주인은 테이블에 외래 키가 있는 곳을 정해야 한다.
+
+예제에서는 회원 테이블이 외래 키를 가지고 있기 때문에 `Member.team`이 주인이 된다.
+
+데이터베이스 테이블의 다대일, 일대 다 관계에서는 항상 **다** 쪽이 외래 키를 가진다.
+
+따라서 `@ManyToOne`에는 `mappedBy` 속성이 없다.
 
