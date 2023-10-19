@@ -454,3 +454,139 @@ for (Member member : members) {
 
 따라서 `@ManyToOne`에는 `mappedBy` 속성이 없다.
 
+### 양방향 연관관계 저장
+
+```java
+Team team1 = new Team("team1", "팀1");
+em.persist(team1);
+
+Member member1 = new Member("member1", "회원1");
+member1.setTeam(member1);
+em.persist(member1);
+
+Member member2 = new Member("member2", "회원2");
+member2.setTeam(member2)
+em.persist(member2);
+```
+
+연관관계 주인을 통해 팀과 회원을 저장했다.
+
+양방향 연관관계에서는 연관관계의 주인이 외래 키를 관리하기 때문에 **주인이 아닌 방향은 값을 설정하지 않아도 데이터베이스에 외래 키 값이 정상 입력된다.**
+
+**주인이 아닌 곳에 입력된 값은 외래 키에 영향을 주지 않는다.**
+
+엔티티 매니저는 이곳에 입력된 값을 사용해서 외래 키를 관리한다.
+
+### 양방향 연관관계의 주의점
+
+양방향 연관관계에서 주의할 점은 연관관계의 주인에는 값을 입력하지 않고 주인이 아닌 곳에만 값을 입력하면 정상적으로 저장이되지 않는다는 것이다.
+
+```java
+Member member1 = new Member("member1", "회원1");
+em.persist(member1);
+
+Member member2 = new Member("member2", "회원2");
+em.persist(member2);
+
+Team team1 = new Team("team1", "팀1");
+// 주인이 아닌 곳만 연관관계 설정
+team1.getMembers().add(member1);
+team1.getMembers().add(member2);
+em.persist(team1);
+```
+
+연관관계의 주인만이 외래 키의 값을 변경할 수 있다.
+
+### 순수한 객체까지 고려한 양방향 연관관계
+
+**객체 관점에서 양쪽 방향에 모두 값을 입력해주는 것이 가장 안전하다.**
+
+그렇지 않으면 JPA를 사용하지 않는 순수한 객체 상태에서 심각한 문제가 발생할 수 있다.
+
+ORM은 객체와 관계형 데이터베이스 둘 다 중요하기 때문에 데이터베이스와 객체를 함께 고려해야 한다.
+
+객체까지 고려하면 양쪽 다 관계를 맺어야 한다.
+
+```java
+    Team team1 = new Team("team1", "팀1");
+    em.persist(team1);
+    
+    Member member1 = new Member("member1", "회원1");
+    
+    member1.setTeam(team1);
+    team1.getMembers().add(member1);
+    em.persist(member1);
+
+    Member member2 = new Member("member2", "회원2");
+
+    member2.setTeam(team1);
+    team1.getMembers().add(member2);
+    em.persist(member2);
+```
+
+양쪽에 연관관계를 설정했기 때문에 순수한 객체 상태에서도 동작한다.
+
+테이블의 외래 키도 정상 입력된다.
+
+이때는 연관관계의 주인인 `Member.team` 값을 사용한다.
+
+### 연관관계 편의 메서드
+
+양방향 연관관계는 양쪽 다 신경써야 한다.
+
+양쪽에 연관관계를 맺다보면 실수로 둘 중 하나만 호출해 양방향이 깨질 수 있다.
+
+```java
+  public void setTeam(Team team) {
+    this.team = team;
+    team.getMembers().add(this);
+  }
+```
+
+위의 코드처럼 메소드 하나로 양방향 관계를 모두 설정할 수 있도록한다.
+
+한 번에 양방향 관계를 설정하는 메서드를 **연관관계 편의 메서드**라 한다.
+
+### 연관관계 편의 메서드 작성 시 주의사하아
+
+`setTeam()` 메서드에는 버그가 있다.
+
+`setTeam` 호출 후 다른 팀으로 변경할 때 기존 팀과 회원의 연관관계를 삭제하는 코드를 추가해야 한다.
+
+```java
+  public void setTeam(Team team) {
+    // 기존 팀과 관계를 제거
+    if (this.team != null) {
+      this.team.getMembers().remove(this);
+    }
+    this.team = team;
+    team.getMembers().add(this);
+  }
+```
+
+객체에서 양방향 연관관계를 사용하려면 로직을 견고하게 작성해야 한다.
+
+### 정리
+
+단방향 매핑과 비교해 양방향 매핑은 복잡하다.
+
+**양방향의 장점은 반대방향으로 객체 그래프 탐색 기능이 추가된 것 뿐이다.**
+
+주인의 반대편읜 `mappedBy`를 사용해 주인을 지정해야 한다.
+
+주인의 반대편은 단순히 객체 그래프 탐색만 할 수 있다.
+
+- 단방향 매핑만으로 테이블과 객체의 연관관계 매핑은 이미 완료되었다.
+- 단방향을 양방향으로 만들면 반대방향으로 객체 그래프 탐색 기능이 추가된다.
+- 양방향 연관관계를 매핑하려면 객체에서 양쪽 방향을 모두 관리해야 한다.
+
+#### 연관관계의 주인을 정하는 기준
+
+연관관계의 주인은 외래 키의 위치와 관련해서 정해야지 비즈니스 중요도로 접근하면 안 된다.
+
+양방향 매핑시에는 무한루프에 빠지지 않게 조심해야 한다.
+
+`일대다`를 연관관계의 주인으로 선택하는 것이 불가능한 것은 아니지만 성능과 관리 측면에서 권장하지 않는다.
+
+
+
