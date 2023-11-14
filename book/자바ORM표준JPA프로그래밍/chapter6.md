@@ -595,3 +595,72 @@ JPA에서는 복합 키를 사용하기 위해 별도의 식별자 클래스를 
 
 이 방법이 ORM 매핑 시에 복합 키를 만들지 않아도 되므로 간단히 매핑을 완성할 수 있다.
 
+```java
+@Entity
+public class Order {
+  @Id @GeneratedValue
+  @Column(name = "ORDER_ID")
+  private Long id;
+  
+  @ManyToOne
+  @JoinColumn(name = "MEMBER_ID")
+  private Member member;
+
+  @ManyToOne
+  @JoinColumn(name = "PRODUCT_ID")
+  private Product product;
+}
+```
+
+```java
+@Entity
+public class Member {
+  @Id @Column(name = "MEMBER_ID")
+  private String id;
+
+  private String username;
+
+  @OneToMany(mappedBy = "member")
+  private List<Order> orders = new ArrayList<>(); 
+}
+```
+
+```java
+@Entity
+public class Member {
+  @Id @Column(name = "MEMBER_ID")
+  private String id;
+
+  private String username;
+
+  @OneToMany(mappedBy = "member")
+  private List<Order> orders = new ArrayList<>(); 
+}
+```
+
+```java
+@Entity
+public class Product {
+  @Id @Column(name = "PRODUCT_ID")
+  private String id;
+  private String name;
+}
+
+```
+
+대리 키를 사용함으로써 식별 관계에 복합 키를 사용하는 것보다 매핑이 단순하고 이해하기 쉬워졌다.
+
+이렇게 새로운 기본 키를 사용해 다대다 관계를 풀어내는 것도 좋은 방법이다.
+
+### 다대다 연관관계 정리
+
+다대다 관계를 일대다 다대일 관계로 풀어내기 위해 연결 테이블을 만들 때 식별자를 어떻게 구성할지 선택해야 한다.
+
+- 식별 관계: 받아온 식별자를 기본 키 + 외래 키로 사용한다.
+- 비식별 관계: 받아온 식별자는 외래 키로만 사용하고 새로운 식별자를 추가한다.
+
+데이터베이스 설계에서는 기본 키 + 외래 키로 사용하는 것을 식별 관계라 하고, 외래 키로만 사용하는 것을 비식별 관계라고 한다.
+
+객체 입장에서는 비식별 관계를 사용하는 것이 단순하고 편리하게 ORM 매핑을 할 수 있다.
+
+이러한 이유로 식별 관계보다는 비식별 관계를 추천한다.
