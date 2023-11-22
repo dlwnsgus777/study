@@ -78,3 +78,123 @@ public class Movie extends Item{
 
 주의점은 자식 엔티티가 매핑한 컬럼 모두 `null`을 허용해야 한다.
 
+```java
+@Entity
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "DTYPE")
+public abstract class Item {
+  @Id @GeneratedValue
+  @Column(name = "ITEM_ID")
+  private Long id;
+
+  private String name;
+  private int price;
+}
+
+@Entity
+@DiscriminatorValue("M")
+public class Movie extends Item {
+  private String director;
+  private String actor;
+}
+
+@Entity
+@DiscriminatorValue("A")
+public class Album extends Item{
+  private String artist;
+}
+```
+
+`@Inheritance(strategy = InheritanceType.SINGLE_TABLE)`로 설정하면 단일 테이블 전략을 사용한다.
+
+- 장점:
+  - 조인이 필요 없으므로 일반적으로 조회 성능이 빠르다.
+  - 조회 쿼리가 단순하다.
+- 단점:
+  - 자식 엔티티가 매핑한 컬럼은 모두 `null`을 허용해야 한다.
+  - 단일 테이블에 모든 것을 저장하기 때문에 테이블이 커질 수 있다. 상황에 따라서는 조회 성능이 오히려 느릴 수 있다.
+- 특징:
+  - 구분 컬럼을 꼭 사용해야 한다.
+  - `@DiscriminatorValue`를 지정하지 않으면 기본으로 엔티티 이름을 사용한다.
+
+### 구현 클래스마다 테이블 전략
+
+자식 엔티티마다 테이블을 만드는 전략이다.
+
+```java
+@Entity
+@Inheritance(strategy = InheritanceType.TABLE_PER_CLASS)
+public abstract class Item {
+  @Id @GeneratedValue
+  @Column(name = "ITEM_ID")
+  private Long id;
+
+  private String name;
+  private int price;
+}
+
+@Entity
+public class Movie extends Item {
+  private String director;
+  private String actor;
+}
+
+@Entity
+public class Album extends Item{
+  private String artist;
+}
+```
+
+일반적으로 추천하지 않는 전략이다.
+
+- 장점:
+  - 서브 타입을 구분해서 처리할 때 효과적이다.
+  - `not null` 제약조건을 사용할 수 있다.
+- 단점:
+  - 여러 자식 테이블을 함께 조회할 때 성능이 느리다.
+  - 자식 테이블을 통합해서 쿼리하기 어렵다.
+- 특징:
+  - 구분 컬럼을 사용하지 않는다.
+
+이 전략은 데이터베이스 설계자와 ORM 전문가 둘 다 추천하지 않으므로 조인이나 단일 테이블 전략을 고려하자.
+
+### @MappedSuperclass
+
+부모 클래스는 테이블과 매핑하지 **않고** 부모 클래스를 상속 받는 자식 클래스에게 매핑 정보만 제공하고 싶으면 `@MappedSuperclass`를 사용하면 된다.
+
+`@MappedSuperclass`는 추상 클래스와 비슷한데 `@Entity`는 실제 테이블과 매핑되지만 `@MappedSuperclass`는 실제 테이블과 매핑되지 않는다.
+
+단순히 매핑 정보를 상속할 목적으로만 사용된다.
+
+```java
+@MappedSuperclass
+public abstract class BaseEntity {
+  @Id @GeneratedValue
+  private Long id;
+  private String name;
+}
+
+@Entity
+public class Member extends BaseEntity{
+  
+  private String email;
+}
+```
+
+`BaseEntity`에는 객체들이 주로 사용하는 공통 매핑 정보를 정의한다.
+
+부모로부터 물려받은 매핑 정보를 재정의하려면 `@AttributeOverrides`나 `@AttributeOverride`를 사용하면 된다.
+
+연관관계를 재정의하려면 `@AssociationOverrides`나 `@AssociationOverride`를 사용하면 된다.
+
+`@MappedSuperclass` 특징은 다음과 같다.
+
+- 테이블과 매핑되지 않고 자식 클래스에 엔티티 매핑 정보를 상속하기 위해 사용한다.
+- `@MappedSuperclass`로 지정한 클래스는 엔티티가 아니다.
+  - `em.find()`나 `JPQL`에서 사용할 수 없다.
+- 이 클래스를 직접 생성해 사용할 일은 거의 없으므로 **추상 클래스**로 만드는 걸 권장한다.
+
+엔티티는 엔티티이거나 `@MappedSuperclass`로 지정한 클래스만 상속받을 수 있다.
+
+### 복합 키와 식별 관계 매핑
+
