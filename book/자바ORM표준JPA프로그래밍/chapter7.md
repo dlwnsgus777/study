@@ -488,11 +488,160 @@ public class GrandChildId implements Serializable {
 
 ### @EmbeddedId와 식별 관계
 
+`@EmbeddedId`로 식별 관계를 구성할 때는 `@MapsId`를 사용해야 한다.
+
+```java
+@Entity
+public class Parent {
+
+  @Id @Column(name = "PARENT_ID")
+  private String id;
+  private String name;
+}
+```
+
+```java
+@Entity
+public class Parent {
+
+  @Id @Column(name = "PARENT_ID")
+  private String id;
+  private String name;
+}
+```
+
+```java
+@Entity
+@IdClass(ChildId.class)
+public class Child {
+  
+  @EmbeddedId
+  public ChildId id;
+  
+  @MapsId("parentId")
+  @ManyToOne
+  @JoinColumn(name = "PARENT_ID")
+  public Parent parent;
+
+  @Id
+  @Column(name = "CHILD_ID")
+  private String childId;
+}
+```
+
+```java
+@Embeddable
+public class ChildId implements Serializable {
+  private String parentId;
+  private String childId;
+
+  // equals, hashCode 구현 생략
+
+}
+```
+
+```java
+
+@Entity
+public class GrandChild {
+  
+  @EmbeddedId
+  private GrandChildId id;
+
+  @MapsId("childId")
+  @ManyToOne
+  @JoinColumns({
+          @JoinColumn(name = "PARENT_ID"),
+          @JoinColumn(name = "CHILD_ID")
+  })
+  public Child child;
+}
+```
+
+```java
+@Embeddable
+public class GrandChildId implements Serializable {
+  private ChildId child;
+
+  @Column(name = "GRANDCHILD_ID")
+  private String id;
 
 
+  @Override
+  public boolean equals(final Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+
+    final GrandChildId that = (GrandChildId) o;
+
+    if (!Objects.equals(child, that.child)) return false;
+    return Objects.equals(id, that.id);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = child != null ? child.hashCode() : 0;
+    result = 31 * result + (id != null ? id.hashCode() : 0);
+    return result;
+  }
+}
+```
+
+`@MapsId`는 외래 키와 매핑한 연관관계를 기본 키에도 매핑하겠다는 뜻이다.
 
 
+### 비식별 관계로 구현
 
+그 동안의 예제를 비식별 관계로 구현하는 코드이다.
+
+```java
+@Entity
+public class Parent {
+
+  @Id @GeneratedValue
+  @Column(name = "PARENT_ID")
+  private Long id;
+  private String name;
+}
+```
+```java
+@Entity
+public class Child {
+
+  @Id @GeneratedValue
+  @Column(name = "CHILD_ID")
+  private Long id;
+  private String name;
+
+  @ManyToOne
+  @JoinColumn(name = "PARENT_ID")
+  private Parent parent;
+}
+```
+```java
+@Entity
+public class GrandChild {
+
+  @Id @GeneratedValue
+  @Column(name = "GRANDCHILD_ID")
+  private Long id;
+  private String name;
+
+  @ManyToOne
+  @JoinColumn(name = "CHILD_ID")
+  private Child child;
+}
+```
+
+복합 키를 사용한 코드보다 매핑도 쉽고 코드도 단순하다.
+
+또한 복합 키가 없으므로 복합 키 클래스를 만들지 않아도 된다.
+
+### 일대일 식별 관계
+
+일대일 식별 관계는 자식 테이블의 기본 키 값으로 부모 테이블의 기본 키 값만 사용한다.
+
+부모 테이블의 기본 키가 복합 키가 아니면 자식 테이블의 기본 키는 복합 키로 구성하지 않아도 된다.
 
 
 
