@@ -643,8 +643,143 @@ public class GrandChild {
 
 부모 테이블의 기본 키가 복합 키가 아니면 자식 테이블의 기본 키는 복합 키로 구성하지 않아도 된다.
 
+```java
+@Entity
+public class BoardDetail {
+  @Id
+  private Long boardId;
+
+  @MapsId
+  @OneToOne
+  @JoinColumn(name = "BOARD_ID")
+  private Board board;
+}
+```
+
+식별자가 단순히 컬럼 하나면 `@MapsId`를 사용하고 속성 값은 비워두면 된다.
+
+### 식별, 비식별 단계의 장단점
+
+- 식별 관계는 부모 테이블의 기본 키를 자식 테이블로 전파하면서 자식 테이블의 기본 키 컬럼이 점점 늘어난다.
+
+- 식별 관계는 2개 이상의 컬럼을 합해서 복합 기본 키를 만들어야 하는 경우가 많다.
+
+- 식별 관계를 사용할 때 기본 키로 비즈니스 의미가 있는 자연 키 컬럼을 조합하는 경우가 많다.
+
+- 비식별 관계의 기본 키는 비즈니스와 전혀 관계없는 대리 키를 주로 사용한다.
+
+- 식별 관계는 부모 테이블의 기본 키를 자식 테이블의 기본 키로 사용하므로 비식별 관계보다 테이블 구조가 유연하지 못하다.
+
+객체 관계 매핑의 관점에서 다음과 같은 이유로 비식별 관계를 선호한다.
+
+- 일대일 관계를 제외하고 식별 관계는 2개 이상의 컬럼을 묶은 복합 기본 키를 사용한다.
+- 비식별 관계의 기본 키는 주로 대리 키를 사용한다.
+
+식별 관계가 가지는 장점도 있는데 다음과 같다.
+
+- 기본 키 인덱스를 활용하기 좋다.
+- 특정 상황에 조인 없이 하위 테이블만으로 검색을 할 수 있다.
+
+`ORM` 신규 프로젝트 진행시에는 될 수 있으면 **비식별 관계를 사용하고 기본 키는 Long 타입의 대리 키를 사용**하는 것을 추천한다.
+
+선택적 비식별 관계보다는 필수적 비식별 관계를 사용하는 것이 내부 조인만 사용해도 되기 때문에 좋다.
+
+### 조인 테이블
+
+데이터베이스 테이블의 연관관계를 설계하는 방법은 크게 2가지다.
+
+- 조인 컬럼 사용
+- 조인 테이블 사용
+
+조인 테이블은 주로 다대다 관계를 일대다, 다대일 관계로 풀어내기 위해 사용한다.
+
+### 일대일 조인 테이블
+
+일대일 관계를 만들려면 조인 테이블의 외래 키 컬럼 각각에 유니크 제약조건을 걸어야 한다.
+
+```java
+@Entity
+public class Parent {
+
+  @Id
+  @GeneratedValue
+  private Long id;
+
+  @OneToOne
+  @JoinTable(name = "PARENT_CHILD",
+          joinColumns = @JoinColumn(name = "PARNET_ID"),
+          inverseJoinColumns = @JoinColumn(name = "CHILD_ID")
+  )
+  private Child child;
+}
+```
+
+```java
+@Entity
+public class Child {
+
+  @Id
+  @GeneratedValue
+  @Column(name = "CHILD_ID")
+  private Long id;
+
+}
+```
+
+`@JoinTable`을 사용한다.
+
+속성은 다음과 같다.
+
+- name: 매핑할 조인 테이블 이름
+- joinColumns: 현재 엔티티를 참조하는 외래 키
+- inverseJoinColumns: 반대방향 엔티티를 참조하는 외래 키
+
+### 일대다 조인 테이블
+
+일대다 관계를 만들려면 조인 테이블의 컬럼 중 다(N)와 관련된 컬럼에 유니크 조건을 걸어야 한다.
 
 
+### 다대일 조인 테이블
 
+다대일은 일대다에서 방향만 반대이다.
+
+### 다대다 조인 테이블
+
+다대다 관계를 만들려면 종니 테이블의 두 컬럼을 합해서 하나의 복합 유니크 제약조건을 걸어야 한다.
+
+```java
+@Entity
+public class Parent {
+
+  @Id
+  @GeneratedValue
+  private Long id;
+
+  @ManyToMany
+  @JoinTable(name = "PARENT_CHILD",
+          joinColumns = @JoinColumn(name = "PARNET_ID"),
+          inverseJoinColumns = @JoinColumn(name = "CHILD_ID")
+  )
+  private List<Child> child = new ArrayList<Child>;
+  
+}
+```
+
+```java
+@Entity
+public class Child {
+
+  @Id
+  @GeneratedValue
+  @Column(name = "CHILD_ID")
+  private Long id;
+
+```
+
+### 엔티티 하나에 여러 테이블 매핑
+
+잘 사용하지는 않지만 `@SecondaryTable`을 사용하면 한 엔티티에 여러 테이블을 매핑할 수 있다.
+
+이 방법은 항상 두 테이블을 조회하므로 최적화하기 어렵다.
 
 
