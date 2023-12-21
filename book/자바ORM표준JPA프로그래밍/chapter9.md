@@ -209,3 +209,86 @@ b.setCity(b);
 `equals()` 재정의할 때는 `hashCode()` 메서드도 재정의하는 것이 안전하다.
 
 
+### 값 타입 컬렉션
+
+값 타입을 하나 이상 저장하려면 컬렉션에 보관하고 `@ElementCollection`, `@CollectionTable` 어노테이션을 사용하면 된다.
+
+```java
+@Entity
+public class Member {
+  @Id
+  private Long id;
+  private String username;
+
+  @Embedded
+  Address homeAddress;
+
+  @ElementCollection
+  @CollectionTable(name = "FAVORITE_FOODS", 
+    joinColumns = @JoinColumn(name = "MEMBER_ID")
+  )
+  @Column(name = "FOOD_NAME")
+  private set<String> favoriteFoods = new HashSet<String>();
+}
+```
+
+관계형 데이터베이스의 테이블은 컬럼 안에 컬렉션을 포함할 수 없기 때문에 별도의 테이블을 추가하고 `@CollectionTable` 를 사용해서 추가한 테이블을 매핑해야 한다.
+
+### 값 타입 컬렉션 사용
+
+```java
+Member member = new Member();
+
+// 임베디드 값 타입
+member.setHomeAddress(new Address("address"));
+
+// 기본 값 타입 컬렉션
+member.getFavoriteFoods().add("짬뽕");
+member.getFavoriteFoods().add("짜장");
+
+// 임베디드 값 타입 컬렉션
+member.getAddressHistory().add(new Address("address1"));
+
+em.persist(member);
+```
+
+JPA는 영속화할 때 값 타입도 함께 저장한다.
+
+- member: INSERT SQL 1번
+- member.homeAddress: 컬렉션이 아닌 임베디드 값 타입이므로 회원 테이블을 저장하는 SQL에 포함된다.
+- member.favoriteFoods: INSERT SQL 3번
+- member.addressHistory: INSERT SQL 2번
+
+따라서 `em.persist`한번의 호출로 총 6번의 `ISNERT SQL`이 실행된다.
+
+값 타입 컬렉션은 영속성 전이 + 고아 객체 제거 기능을 필수로 가진다고 볼 수 있다.
+
+값 타입 컬렉션도 조회할 때 페치 전략을 선택할 수 있는데 `LAZY`가 기본이다.
+
+값 타입 컬렉션을 수정할 때는 
+
+- 임베디드 값 타입 수정: 임베디드 값 타입은 매핑한 엔티티의 테이블만 UPDATE한다.
+- 기본값 타입 컬렉션 수정: 컬렉션 내의 원소를 제거하고 새로운 원소를 추가해야 한다.
+- 임베디드 값 타입 컬렉션 수정: 값 타입은 불변해야 하기 때문에 기존 컬렉션에서 원소를 제거하고 새로 추가해야 한다.
+
+### 값 타입 컬렉션의 제약사항
+
+엔티티는 식별자가 있으므로 값을 변경해도 식별자로 데이터베이스에 저장된 원본 데이터를 찾아 변경할 수 있다.
+
+하지만 값 타입은 **식별자가 없기** 때문에 데이터베이스에 저장된 원본 데이터를 찾기는 어렵다.
+
+특정 엔티티 하나에 소속된 값 타입은 소속된 엔티티를 찾아 값을 변경하면 되지만 컬렉션에 보관된 값들은 **별도의 테이블에 보관**된다.
+
+컬렉션의 값 타입이 변경되면 데이터베이스에서 원본 데이터를 찾기 어렵다.
+
+JPA 구현체들은 값 타입 컬렉션에 변경 사항이 발생하면, 값 타입 컬렉션이 매핑된 테이블의 모든 데이터를 **삭제**하고 현재 컬렉션에 있는 값 타입들의 모든 값을 데이터베이스에 **다시 저장한다.**
+
+따라서 값 타입 컬렉션이 매핑된 테이블에 데이터가 많다면 값 타입 컬렉션 대신 **일대다 관계**를 고려해야 한다.
+
+값 타입 컬렉션을 매핑하는 테이블은 모든 컬럼을 묶어서 기본 키를 구성해야하기 때문에 `null`을 입력할 수 없고, 중복해서 저장할 수 없다는 제약이 있다.
+
+값 타입 컬렉션 대신 새로운 엔티티를 만들어 **일대다 관계**로 설정한 뒤 **영속성 전이 + 고아 객체 제거** 기능을 적용하면 값 타입 컬렉션처럼 사용할 수 있다.
+
+
+
+
