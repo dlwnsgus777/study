@@ -197,4 +197,226 @@ public void 부모타입으로_프록시조회() {
 
 `em.getReference()` 메서드를 사용해 `Item` 엔티티를 프록시로 조회했다.
 
+이때 실제 조회된 엔티티는 `Book`이므로 `Book`타입을 기반으로 원본 엔티티 인스턴스가 생성된다.
+
+그런데 `Item`엔티티를 대상으로 조회했으므로 프록시는 `Item`타입을 기반으로 만들어진다.
+
+이 프록시 클래스는 원본 엔티티르 `Book` 엔티티를 참조한다.
+
+때문에 프로시는 `Item$Proxy`타입이고 `Book`타입과는 관계가 없다.
+
+따라서 직접 다운 캐스팅을 해도 문제가 발생한다.
+
+프록시를 부모 타입으로 조회하면 부모의 타입을 기반으로 프록시가 생성되는 문제가 있다.
+
+- `instanceof` 연산을 할 수 없다.
+- 하위 타입으로 다운 캐스팅을 할 수 없다.
+
+프록시를 부모 타입으로 조회하는 문제는 주로 다형성을 다루는 도메인에서 나타난다.
+
+상속관계에서 발생하는 프록시 문제를 해결하는 방법은 다음과 같다.
+
+- JPQL로 대상 직접 조회
+간단한 방법은 처음부터 자식 타입을 직접 조회해서 필요한 연산을 하는 것이다.
+
+이 방법을 사용하면 다형성을 사용할 수 없다.
+
+```java
+Book jpqlBook = em.createQuery
+        ("select b from Book b where b.id=:bookId", Book.class)
+        .setParameter("bookId", item.getId())
+        .getSingleResult();
+```
+
+- 프록시 벗기기
+
+하이버네이트가 제공하는 기능을 사용하면 프록시에서 원본 엔티티를 가져올 수 있다.
+
+```java
+//하이버네이트가 제공하는 프록시에서 원본 엔티티를 찾는 기능을 사용하는 메소드
+public static <T> T unProxy(Object entity){
+	if(entity instanceof HibernateProxy) {
+		entity = ((HibernateProxy) entity)
+				.getHibernateLazyInitializer()
+				.getImplementation();
+	}
+	return (T) entity;
+}
+```
+
+이 방법은 **프록시에서 원본 엔티티를 직접 꺼내기 때문에 프록시와 원본 엔티티의 동일성 비교가 실패한다는 문제점이 있다.**
+
+이 방법을 사용할 때는 원본 엔티티가 꼭 필요한 곳에서 잠깐 사용하고 다른 곳에서 사용되지 않도록 하는 것이 중요하다.
+
+참고로 원본 엔티티의 값을 직접 변경해도 변경 감지 기능은 동작한다.
+
+- 기능을 위한 별도의 인터페이스 제공
+
+```java
+public interface TitleView {
+	String getTitle();
+}
+
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "DTYPE")
+public abstract class Item implements TitleView {
+	@Id @GeneratedValue
+	@Column(name = "ITEM_ID")
+	private Long id;
+	
+	...
+}
+```
+`TitleView` 라는 공통 인터페이스를 만들고 자식 클래스들은 인터페이스의 `getTitle()` 메서드를 각각 구현했다.
+
+사용하는 곳에서 `getTitle()`을 호출하면 된다.
+
+이처럼 인터페이스를 제공하고 각각의 클래스가 자신에 맞는 기능을 구현하는 것은 다형성을 활용하는 좋은 방법이다.
+
+이 방법을 사용할 때는 프록시의 특징 때문에 프록시의 대상이 되는 타입에 인터페이스를 적용해야 한다.
+
+- 비지터 패턴 사용
+
+비지터 패턴을 사용해서 상속관계와 프록시 문제를 해결할 수 있다.
+
+```java
+public interface Visitor {
+	void visit(Book book);
+	void visit(Album album);
+	void visit(Movie movie);
+}
+public class PrintVisitor implements Visitor {
+	@Override
+	public void visit(Book book) {
+		//넘어오는 book은 Proxy가 아닌 원본 엔티티다. 
+		System.out.println("book.class = " + book.getClass());
+	}
+	
+	@Override
+	void visit(Album album) {...}
+	@Override
+	void visit(Movie movie) {...}
+@Entity
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "DTYPE")
+public abstract class Item {
+
+	@Id @GeneratedValue
+	@Column(name = "ITEM_ID")
+	private Long id;
+
+	...
+
+	public abstract void accept(Visitor visitor);
+}
+
+@Entity
+@DiscriminatorValue("B")
+public class Book extends Item {
+
+	...
+	@Override
+	public void accept(Visitor visitor){
+		visitor.visit(this);
+	}
+}
+```
+
+비지터 패턴은 `Visitor`와 `Visitor`를 받아들이는 대상 클래스로 구성된다.
+
+비지터 패턴의 장점은 다음과 같다.
+
+- 프록시에 대한 걱정 없이 안전하게 원본 엔티티에 접근할 수 있다.
+- `instanceof`와 타입캐스팅 없이 코드를 구현할 수 있다.
+- 알고리즘과 객체 구조를 분리해서 구조를 수정하지 않고 새로운 동작을 추가할 수 있다.
+
+단점은 다음과 같다.
+
+- 너무 복잡하고 더블 디스패치를 사용하기 때문에 이해하기 어렵다.
+- 객체 구조가 변경되면 모든 `Visitor`를 수정해야 한다.
+
+
+### 성능 최적화
+
+JPA로 애플리케이션을 개발할 때 발생하는 다양한 성능 문제와 해결 방안을 알아보자.
+
+### N + 1 문제
+
+JPA로 애플리케이션을 개발할 때 성능상 가장 주의해야 하는 것이 `N+1`문제다.
+
+### 즉시 로딩과 N + 1
+
+즉시 로딩의 문제점은 JPQL을 사용할 때 발생한다.
+
+JPQL을 실행하면 JPA는 이것을 분석해서 SQL을 생성한다.
+
+이때는 즉시 로딩과 지연 로딩에 대해서 전혀 신경 쓰지 않고 JPQL만 사용해 SQL을 생성한다.
+
+이때 엔티티와 연관된 컬렉션이 즉시 로딩으로 설정되어 있으면 JPA는 컬렉션을 즉시 로딩하려고 SQL을 추가로 실행한다.
+
+이처럼 **처음 실행한 SQL의 결과 수만큼 추가로 SQL을 실행하는 것을 N + 1문제라 한다.**
+
+즉시 로딩은 JPQL을 실행할 때 N + 1 문제가 발생할 수 있다.
+
+### 지연 로딩과 N + 1
+
+즉시 로딩을 지연 로딩으로 변경해도 N + 1에서 자유로울 수는 없다.
+
+지연 로딩으로 설정하면 JPQL에서는 N + 1 문제가 발생하지 않는다.
+
+이후 비즈니스 로직에서 컬렉션을 사용할 때 SQL이 추가로 실행되는데 이것도 결국 `N + 1`문제다.
+
+`N + 1`문제를 해결하는 방법에 대해 알아보자.
+
+### 페치 조인 사용
+
+`N+1` 문제를 해결하는 가장 일반적인 방법은 페치 조인을 사용하는 것이다.
+
+페치 조인은 SQL 조인을 사용해서 연관된 엔티티를 함께 조회하므로 `N+1`문제가 발생하지 않는다.
+
+이때 중복된 결과가 나타날 수 있으므로 JPQL의 `DISTINCT`를 사용해 중복을 제거하는 것이 좋다.
+
+### 하이버네이트 @BatchSize
+
+하이버네이트가 제공하는 `@BatchSize`를 사용하면 연관된 엔티티를 조회할 때 지정한 `size`만큼 SQL의 `IN` 절을 사용해 조회한다.
+
+만약 조회한 회원이 10명인데 `size=5`로 지정하면 2번의 SQL만 추가로 실행한다.
+
+`default_batch_size`속성을 사용하면 애플리케이션 전체에 기본으로 `@BatchSize`를 적용할 수 있다.
+
+### 하이버네이트 @Fetch(FetchMode.SUBSELECT)
+
+하이버네이트가 제공하는 `@Fetch`에 `FetchMode.SUBSELECT`로 사용하면 연관된 데이터를 조회할 때 서브 쿼리를 사용해서 `N+1`문제를 해결한다.
+
+```java
+@Entity
+public class Member {
+
+	@Id @GeneratedValue
+	private Long id;
+
+	@Fetch(FetchMode.SUBSELECT)
+	@OneToMany(mappedBy = "member", fetch = FetchType.EAGER)
+	private List<Order> orders = new ArrayList<Order>();
+
+	...
+}
+```
+
+### N + 1 정리
+
+즉시 로딩과 지연 로딩 중 추천하는 방법은 즉시 로딩은 사용하지 말고 지연 로딩만 사용하는 것이다.
+
+즉시 로딩의 가장 큰 문제점은 성능 최적화가 어렵다는 점이다.
+
+에티티를 조회하다보면 즉시 로딩이 연속으로 발생해 예상하지 못한 SQL이 실행될 수 있다.
+
+따라서 모두 지연 로딩으로 설정하고 성능 최적화가 꼭 필요한 곳에는 JPQL 페치 조인을 사용하자.
+
+JPA의 글로벌 페치 전략 기본값은 다음과 같다.
+
+- `@OneToOne`, `@ManyToOne` : 기본 페치 전략은 즉시 로딩
+- `@OneToMany`, `@ManyToMany` : 기본 페치 전략은 지연 로딩
+
+기본 값이 즉시 로딩이라면 `fetchType.Lazy`로 설정해서 지연 로딩 전략을 사용하도록 변경하자.
 
