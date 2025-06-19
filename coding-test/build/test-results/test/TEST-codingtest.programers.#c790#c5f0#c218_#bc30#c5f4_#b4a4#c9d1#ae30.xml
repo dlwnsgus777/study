@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="codingtest.programers.자연수_배열_뒤집기" tests="4" skipped="0" failures="0" errors="0" timestamp="2025-06-19T01:22:36" hostname="Finnui-MacBookPro.local" time="0.044">
+  <properties/>
+  <testcase name="[1] 12345, 5,4,3,2,1" classname="codingtest.programers.자연수_배열_뒤집기" time="0.035"/>
+  <testcase name="[2] 8, 8" classname="codingtest.programers.자연수_배열_뒤집기" time="0.001"/>
+  <testcase name="[3] 123, 3,2,1" classname="codingtest.programers.자연수_배열_뒤집기" time="0.001"/>
+  <testcase name="[4] 100023, 3,2,0,0,0,1" classname="codingtest.programers.자연수_배열_뒤집기" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
