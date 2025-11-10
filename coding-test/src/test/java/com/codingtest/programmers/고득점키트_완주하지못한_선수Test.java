@@ -1,10 +1,9 @@
 package com.codingtest.programmers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
 
+import com.codingtest.programmers.고득점키트.해시.고득점키트_완주하지못한_선수;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;

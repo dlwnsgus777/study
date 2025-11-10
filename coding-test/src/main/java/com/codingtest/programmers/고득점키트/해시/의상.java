@@ -1,4 +1,4 @@
-package com.codingtest.programmers;
+package com.codingtest.programmers.고득점키트.해시;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,6 +14,5 @@ public class 의상 {
         answer = cmap.values().stream().reduce(0, (a, b) -> a + b);
         answer += cmap.size();
         return answer;
-
     }
 }

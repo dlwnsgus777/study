@@ -1,4 +1,4 @@
-package com.codingtest.programmers;
+package com.codingtest.programmers.고득점키트.해시;
 
 import java.util.Arrays;
 

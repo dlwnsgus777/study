@@ -1,9 +1,6 @@
-package com.codingtest.programmers;
+package com.codingtest.programmers.고득점키트.해시;
 
 import java.util.Arrays;
-import java.util.List;
-import java.util.Stack;
-import java.util.stream.Collectors;
 
 public class 고득점키트_완주하지못한_선수 {
     public String solution(String[] participant, String[] completion) {

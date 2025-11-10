@@ -2,6 +2,7 @@ package com.codingtest.programmers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.codingtest.programmers.고득점키트.해시.전화번호_목록;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
