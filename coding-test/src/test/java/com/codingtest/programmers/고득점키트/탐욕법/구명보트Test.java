@@ -21,12 +21,12 @@ class 구명보트Test {
     private static Stream<Arguments> provideTestData() {
         return Stream.of(
             Arguments.of(
-                new int[] {70,50,80,50},
+                new int[] {70, 50, 80, 50},
                 100,
                 3
                         ),
             Arguments.of(
-                new int[] {100,100,100},
+                new int[] {100, 100, 100},
                 100,
                 3
                         ),
@@ -36,5 +36,5 @@ class 구명보트Test {
                 2
                         )
                         );
-}
+    }
 }
