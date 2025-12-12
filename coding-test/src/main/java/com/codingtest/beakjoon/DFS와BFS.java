@@ -3,6 +3,8 @@ package com.codingtest.beakjoon;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.LinkedList;
+import java.util.Queue;
 
 public class DFS와BFS {
 
@@ -35,7 +37,9 @@ public class DFS와BFS {
 
         dfs(start);
         SB.append("\n");
+        visit = new boolean[n + 1];
 
+        bfs(start);
         System.out.println(SB.toString());
 
         bf.close();
@@ -48,6 +52,24 @@ public class DFS와BFS {
         for (int i = 1; i < n + 1; i++) {
             if (arr[start][i] == 1 && !visit[i]) {
                 dfs(i);
+            }
+        }
+    }
+
+    public static void bfs(int start) {
+        Queue<Integer> q = new LinkedList<>();
+        q.add(start);
+        visit[start] = true;
+
+        while (!q.isEmpty()) {
+            start = q.poll();
+            SB.append(start + " ");
+            for (int i = 1; i < n + 1; i++) {
+                if ( arr[start][i] == 1 && !visit[i]) {
+                    q.add(i);
+                    visit[i] = true;
+                }
+
             }
         }
     }
